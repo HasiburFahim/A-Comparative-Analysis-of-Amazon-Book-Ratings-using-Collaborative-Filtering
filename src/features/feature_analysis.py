@@ -5,19 +5,18 @@ import seaborn as sb
 from matplotlib.font_manager import FontProperties
 import plotly.express as px
 import plotly.graph_objects as go
-import construct_features
 import sys
 import os
+import construct_features
 sys.path.append(os.path.abspath('../visualization'))
 import visualize
 
 
 class FeatureAnalysis:
     def __init__(self):
-        # Script Set-ups
+        # Object Instance
         cf = construct_features.ConstructFeatures()
         self.df_info, self.df_rating = cf.construct_features()
-
         self.visual = visualize.Visualize()
 
     @staticmethod
@@ -37,41 +36,56 @@ class FeatureAnalysis:
 
     @staticmethod
     def display_dataframe(name, df, contents):
-        table = df.head(contents)
+        df_table = df.head(contents)
         print('\n')
         print("=" * 150)
         print("◘ ", name, " Dataframe:")
-        print(table.to_string())
+        print(df_table.to_string())
         print("=" * 150)
 
-    def data_inspection(self):
+    def feature_analysis(self):
         # Inspect distribution for Ratings
         bins = 10
-        subtext = "Book Ratings"
+        d1 = self.df_rating['rating']
+        d2 = self.df_rating['book_price']
+        title_d1 = "Histogram: Book Ratings"
+        title_d2 = "Histogram: Book Prices"
+        self.visual.plot_multi_histogram(d1, d2, bins, title_d1, title_d2)
+
+        # Density Inspection
+        df = self.df_rating['rating']
+        text = "Kde Plot: Book Ratings"
         x_label = "Ratings"
         y_label = "Frequency"
+        self.visual.plot_kde(df, text, x_label, y_label)    # !!!
 
-        kind = 'hist'
-        self.visual.plot_dataframe(self.df_rating['rating'], subtext, kind, x_label, y_label, "Histogram")
+        df = self.df_rating['book_price']
+        text = "Kde Plot: Book Prices"
+        x_label = "Prices"
+        y_label = "Frequency"
+        self.visual.plot_kde(df, text, x_label, y_label)    # !!!
 
-        kind = 'kde'
-        # self.plot_dataframe(self.df_rating['rating'], subtext, kind, x_label, y_label, "KDE")
+        # Pearson Correlation for Numerical features
+        df_heatmap = self.df_rating[['rating', 'book_price']].copy()
+        self.visual.plot_correlation(df_heatmap)
 
         # Acquire top 10 Book Genres
-        subtext = "Book Genres"
+        text = "Pie Distribution: Book Genres"
         genre = self.df_info['categories'].value_counts().sort_values(ascending=False)
         genre = genre.head(10)
-        self.debug_text(subtext, genre)
+        self.debug_text(text, genre)
 
         # Inspect distribution for Genres
-        explode = (0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        bbox_to_anchor = (1, 1.2)
         labels = genre.keys().map(str)
-        self.visual.plot_pie(genre, subtext, labels, explode)
+        explode = (0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        self.visual.plot_pie(genre, explode, labels, text, bbox_to_anchor)
 
         kind = 'barh'
+        text = "Bar Chart: Book Genres"
         x_label = "Frequency"
         y_label = "Genres"
-        self.visual.plot_dataframe(genre, subtext, kind, x_label, y_label, "Bar")
+        self.visual.plot_dataframe(genre, text, kind, x_label, y_label)
 
         # Identify how much Book Ratings affect its Prices
         ratings_price = self.df_rating[['rating', 'book_price']]
@@ -81,10 +95,10 @@ class FeatureAnalysis:
         x = self.df_rating['rating']
         y = self.df_rating['book_price']
 
-        subtext = "Ratings and Price"
+        text = "Scatter Plot: Ratings and Price"
         x_label = 'Ratings'
         y_label = 'Book Price'
-        self.visual.plot_scatter(x, y, subtext, x_label, y_label)
+        self.visual.plot_scatter(x, y, text, x_label, y_label)
 
         # Books most purchased by users
         most_purchases = self.df_rating.groupby('book_title')['user_id'].count().sort_values()
@@ -97,10 +111,10 @@ class FeatureAnalysis:
         # Inspect query from the visualization chart
         x = most_purchases.values[-15:]
         y = most_purchases.index[-15:]
-        subtext = "Books most bought by users"
+        text = "Bar Plot: Books most bought purchased"
         x_label = "Purchases"
         y_label = "Books"
-        self.visual.plot_plotly_bar(x, y, subtext, x_label, y_label)
+        self.visual.plot_plotly_bar(x, y, text, x_label, y_label)
 
         # Highest Rated Books (Mean)
         highest_rated = self.df_rating.groupby('book_title')['rating'].mean()
@@ -113,10 +127,10 @@ class FeatureAnalysis:
         # Inspect query from the visualization chart
         x = highest_rated.values[-15:]
         y = highest_rated.index[-15:]
-        subtext = "Books with the highest Rating"
+        text = "Bar Plot: Highest Rated Books"
         x_label = "Ratings"
         y_label = "Books"
-        self.visual.plot_plotly_bar(x, y, subtext, x_label, y_label)
+        self.visual.plot_plotly_bar(x, y, text, x_label, y_label)
 
         # Expensive Books in store (highest mean Price)
         expensive_books = self.df_rating.groupby('book_title')['book_price'].mean()
@@ -127,40 +141,39 @@ class FeatureAnalysis:
         self.display_dataframe('Top Expensive Books', df_arg, 15)
 
         # Distribution of Mean Book Prices
-        subtext = "Book Prices"
+        text = "Histogram: Book Price distribution"
         x_label = "Price Range ($)"
         y_label = "Frequency"
-        self.visual.plot_dataframe(df_arg, subtext, 'hist', x_label, y_label, "Histogram")
+        kind = 'hist'
+        self.visual.plot_dataframe(df_arg, text, kind, x_label, y_label)
 
         # Top-rated Books accumulating over 3500 Ratings in total (per book)
         accumulated_ratings = self.df_info[self.df_info['ratings_count'] > 3500][['book_title', 'ratings_count']]\
             .drop_duplicates()
-        subtext = "Books over 3500 Ratings"
         df_arg = accumulated_ratings.sort_values(by=['ratings_count'], ascending=False)
-        self.display_dataframe(subtext, df_arg, 15)
+        self.display_dataframe("Books over 3500 Ratings", df_arg, 15)
 
         # Generate a Bar Plot for visual evidence
+        text = "Bar Plot: Books over 3500 Ratings"
         x = accumulated_ratings['ratings_count']
         y = accumulated_ratings['book_title']
         x_label = "Ratings"
         y_label = "Books"
-        self.visual.plot_plotly_bar(x, y, subtext, x_label, y_label)
+        self.visual.plot_plotly_bar(x, y, text, x_label, y_label)
 
-        # Total books in a particular category
+        # Aggregate books for a particular category
         category_books = self.df_info.groupby('categories')['book_title'].count().sort_values()
         df_temp_info = category_books.to_frame()
         df_temp_info['category_books'] = category_books
 
         df_arg = category_books.sort_values(ascending=False)
-        subtext = "15 Top Books in a Category"
-        self.display_dataframe(subtext, df_arg, 15)
+        self.display_dataframe("15 Top Books in a Category", df_arg, 15)
 
         # Inspect query from the visualization chart
-        x = category_books.values[-15:]
-        y = category_books.index[-15:]
+        text = "Bar Plot: Top 15 Categorical Books"
         x_label = "Books"
         y_label = "Categories"
-        self.visual.plot_plotly_bar(x, y, subtext, x_label, y_label)
+        self.visual.plot_bar(df_arg, text, x_label, y_label, 'h')
 
         # Authors with the most published books
         author_publish = self.df_info.groupby('book_author')['book_title'].count().sort_values().sort_values()
@@ -168,53 +181,44 @@ class FeatureAnalysis:
         df_temp_info['author_publish'] = author_publish
 
         df_arg = author_publish.sort_values(ascending=False)
-        subtext = "Most Books by Author"
-        self.display_dataframe(subtext, df_arg, 15)
+        self.display_dataframe("Most Books by Author", df_arg, 15)
 
         # Represent the query via a Bar chart
-        x = author_publish.values[-15:]
-        y = author_publish.index[-15:]
+        text = "Bar Plot: Most Published Books by Authors"
         x_label = "Authors"
         y_label = "Publishes"
-        self.visual.plot_plotly_bar(x, y, subtext, x_label, y_label)
+        self.visual.plot_bar(df_arg, text, x_label, y_label, 'h')
 
         # Author's active years
         author_years = self.df_info.groupby('book_author')['published_year'].nunique()
         df_temp_info = author_years.to_frame()
         df_temp_info['author_years'] = author_years
 
-        subtext = "Years most active by Authors"
         df_arg = author_years.sort_values(ascending=False)
-        self.display_dataframe(subtext, df_arg, 15)
+        self.display_dataframe("Years most active by Authors", df_arg, 15)
 
-        # Inspect the distribution for the  most active years
+        # Inspect the distribution for the most active years
         subtext = "Top 15 Active Authors"
         df_arg = df_arg.head(15)
-        explode = (0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        bbox_to_anchor = (1, 1.2)
         labels = df_arg.keys().map(str)
-        self.visual.plot_pie(df_arg, subtext, labels, explode)
+        explode = (0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        self.visual.plot_pie(df_arg, subtext, labels, explode, bbox_to_anchor)
 
-        # Authors who worked in a variety genres of book genres
+        # CONTINUE  2.12 Notebook
+        # Authors working with multiple genres
         author_categories = self.df_info.groupby('book_author')['categories'].nunique()
         df_temp_info = author_categories.to_frame()
         df_temp_info['author_categories'] = author_categories
 
-        subtext = "Authors with diverse Categories"
         df_arg = author_categories.sort_values(ascending=False)
-        self.display_dataframe(subtext, df_arg, 15)
-
-        # Inspect query from the visualization chart
-        x = author_categories.values[-15:]
-        y = author_categories.index[-15:]
-        x_label = "Authors"
-        y_label = "Categories"
-        self.visual.plot_plotly_bar(x, y, subtext, x_label, y_label)
+        self.display_dataframe("Authors with diverse Categories", df_arg, 15)
 
         # Display all analyzed Dataframes
-        self.display_dataframe("Inspection Rating Dataframe", df_temp_rating, 25)
-        self.display_dataframe("Inspection Information Dataframe", df_temp_info, 25)
+        self.display_dataframe("Info data", df_temp_info, 25)
+        self.display_dataframe("Rating data", df_temp_rating, 25)
 
 
 if __name__ == "__main__":
     main = FeatureAnalysis()
-    main.data_inspection()
+    main.feature_analysis()
